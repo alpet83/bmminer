@@ -1,0 +1,42 @@
+It just a quest, some steps may-be skipped.
+
+Used instructions from https://bitcointalk.org/index.php?topic=28402.15370;imode
+
+1. Login via SSH to AntMiner
+
+2. Update opkg from most complete feeds
+
+echo "src/gz base2 http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/armv7ahf-vfp-neon/base/" > /etc/opkg/base-feed.conf
+echo "src/gz noarch http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/all/" >> /etc/opkg/feeds.conf
+echo "src/gz noarch http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/armv7ahf-vfp-neon/perl/" >> /etc/opkg/feeds.conf
+opkg update
+
+3. Setup build instruments
+opkg --force-depends --cache /config/opkg.cache install update-alternatives
+opkg --force-depends --cache /config/opkg.cache install automake autoconf make gcc cpp binutils git less pkgconfig-dev ncurses-dev libtool nano bash i2c-tools-dev
+while ! opkg --cache /config/opkg.cache install libcurl-dev; do true; done
+
+ln -s /usr/bin/arm-angstrom-linux-gnueabi-gcc /usr/bin/gcc
+ln -s /usr/bin/arm-angstrom-linux-gnueabi-ar /usr/bin/ar
+ln -s /usr/bin/arm-angstrom-linux-gnueabi-nm /usr/bin/nm
+
+4. Prepare sources
+
+mkdir /config/other
+cd /config/other
+
+# may be troubles with old certificates, so switch checking off
+git config --global http.sslVerify false
+git clone git://github.com/alpet83/bmminer
+
+5. Configure & build
+cd bmminer
+autoconf
+./configure  CC=arm-angstrom-linux-gnueabi-gcc  NM=arm-angstrom-linux-gnueabi-nm AR=arm-angstrom-linux-gnueabi-ar --enable-bitmain-c5
+make cgminer
+
+build must be failed on driver-btm-c5.c and cgminer.c due incomplete source code :(
+
+may be jump_to_app_from_loader == jump_to_app_CheckAndRestorePIC - just need experiment
+
+
