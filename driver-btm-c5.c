@@ -155,7 +155,9 @@ pthread_mutex_t nonce_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t iic_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t opencore_readtemp_mutex = PTHREAD_MUTEX_INITIALIZER;
-extern pthread_mutex_t temp_work_mutex[BITMAIN_MAX_CHAIN_NUM];
+
+
+extern pthread_mutex_t temp_work_mutex[BITMAIN_MAX_CHAIN_NUM]; // alpet: have no idea, where is must be defined & initialized
 
 uint64_t h = 0;
 
@@ -231,7 +233,6 @@ char hash_board_id_string[BITMAIN_MAX_CHAIN_NUM*id_string_len];
 //Test Core
 static int test_core = 8;
 
-
 struct nonce_content temp_nonce_buf[MAX_RETURNED_NONCE_NUM];
 struct reg_content temp_reg_buf[MAX_RETURNED_NONCE_NUM];
 volatile struct nonce_buf nonce_read_out;
@@ -268,15 +269,15 @@ bool isC5_Board()
   FILE *fd;
   char board_type[32];
   int isC5=0;
-  
+
   memset(board_type,'\0',32);
-  
+
 	fd=fopen("/usr/bin/ctrl_bd","rb");
 	if(fd)
 	{
 		fread(board_type,1,32,fd);
 		fclose(fd);
-		
+
 		if(strstr(board_type,"XILINX"))
 			{
 				isC5=0;
@@ -287,7 +288,7 @@ bool isC5_Board()
 	{
 			isC5=1;
 	}
-	
+
 	if(isC5)
 		return true;
 	else return false;
@@ -297,6 +298,7 @@ void writeInitLogFile(char *logstr);
 void clearInitLogFile();
 void re_send_last_job();
 
+// alpet: absent routine may-be critical!
 extern void jump_to_app_CheckAndRestorePIC(int chainIndex); // defined in Clement-bitmain.c
 
 static unsigned char last_job_buffer[8192]={23};
@@ -304,7 +306,7 @@ static unsigned char last_job_buffer[8192]={23};
 ///////////// below they must be changed at same time!!!! ///////////////////////
 typedef enum
 {
-    TEMP_BOTTOM = 0,	// 0 is bottom ,  1  is middle 
+    TEMP_BOTTOM = 0,	// 0 is bottom ,  1  is middle
     TEMP_MIDDLE
 } Temp_Type_E;
 ////////////////////////////////////////////////////////////////////////////
@@ -476,7 +478,7 @@ int getVolValueFromPICvoltage(unsigned char vol_pic)
 int getVoltageLimitedFromHashrate(int hashrate_GHz)
 {
 	int vol_value;
-	
+
 #ifdef R4
 	vol_value=R4_MAX_VOLTAGE;
 #else
@@ -938,7 +940,7 @@ int bitmain_axi_Reinit()
     int ret=0;
 	unsigned int data;
 	char logstr[256];
-	
+
 	data = *axi_fpga_addr;
     if((data & 0x0000FFFF) != HARDWARE_VERSION_VALUE)
     {
@@ -947,7 +949,7 @@ int bitmain_axi_Reinit()
     }
     sprintf(logstr,"axi_fpga_addr data = 0x%x\n", data);
 	writeInitLogFile(logstr);
-	
+
     nonce2_jobid_address = fpga_mem_addr;
     job_start_address_1  = fpga_mem_addr + NONCE2_AND_JOBID_STORE_SPACE/sizeof(int);
     job_start_address_2  = fpga_mem_addr + (NONCE2_AND_JOBID_STORE_SPACE + JOB_STORE_SPACE)/sizeof(int);
@@ -1502,7 +1504,7 @@ bool isTempTooLow()
 {
 	int i;
 	char logstr[256];
-	
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1 && chain_temp_toolow[i]==0 && dev->chain_asic_temp[i][1][PWM_T]>0)
@@ -1531,7 +1533,7 @@ void CheckChainTempTooLowFlag()
 {
 	int i;
 	bool isSomeBoardNotTooLow=false;
-	
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -1557,7 +1559,7 @@ void setChainTempTooLowFlag()
 {
 	int i;
 	char logstr[256];
-	
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		chain_temp_toolow[i]=0;
@@ -1591,7 +1593,7 @@ void set_PWM_according_to_temperature()
 {
     int  pwm_percent = 0, temp_change = 0;
     temp_highest = dev->temp_top1[PWM_T];
-	
+
 #ifdef DEBUG_218_FAN_FULLSPEED
 	if(is218_Temp)
 	{
@@ -1642,7 +1644,7 @@ void set_PWM_according_to_temperature()
         {
             pwm_percent = MAX_PWM_PERCENT;
         }
-		
+
         dev->fan_pwm = pwm_percent;
         applog(LOG_DEBUG,"%s: Set PWM percent : %d\n", __FUNCTION__, pwm_percent);
         set_PWM(pwm_percent);
@@ -1650,10 +1652,10 @@ void set_PWM_according_to_temperature()
     }
 }
 #else
-void set_PWM_according_to_temperature()
+void set_PWM_according_to_temperature() // S9 version!
 {
 	static int fix_fan_steps=0;
-    int  pwm_percent = dev->fan_pwm, temp_change = 0;
+ int  pwm_percent = dev->fan_pwm, temp_change = 0;
 	char logstr[256];
 
 #ifdef TWO_CHIP_TEMP_S9
@@ -1663,7 +1665,7 @@ void set_PWM_according_to_temperature()
 #endif
 
     temp_change = temp_highest - last_temperature;
-	
+
 #ifdef DEBUG_218_FAN_FULLSPEED
 	if(is218_Temp)
 	{
@@ -1682,43 +1684,43 @@ void set_PWM_according_to_temperature()
         dev->fan_pwm = MAX_PWM_PERCENT;
 
         sprintf(logstr,"set full FAN speed...\n");
-		writeLogFile(logstr);
+		      writeLogFile(logstr);
         return;
     }
 
     if(temp_change >= TEMP_INTERVAL || temp_change <= -TEMP_INTERVAL)
     {
-    	sprintf(logstr,"set normal FAN speed...with fix_fan_steps=%d\n",fix_fan_steps);
-		writeLogFile(logstr);
+			    	sprintf(logstr, "set normal FAN speed...with fix_fan_steps=%d\n", fix_fan_steps);
+								writeLogFile(logstr);
 
-		pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
-		
-        if(pwm_percent < 0)
-            pwm_percent = 0;
+								pwm_percent = MIN_PWM_PERCENT + (temp_highest - MIN_FAN_TEMP + fix_fan_steps) * PWM_ADJUST_FACTOR;
 
-		if(pwm_percent > MAX_PWM_PERCENT)
-			pwm_percent=MAX_PWM_PERCENT;
+						  if(pwm_percent < 0)
+						     pwm_percent = 0;
 
-#ifdef TWO_CHIP_TEMP_S9
-		if(dev->temp_top1[PWM_T] > 110 && pwm_percent<MAX_PWM_PERCENT)
-#else
-		if(temp_highest>=MAX_TEMP_NEED_UP_FANSTEP && pwm_percent<MAX_PWM_PERCENT)
-#endif
-		{	// if fan speed is not max,  and temp is too high, we need add fix fan steps
-			fix_fan_steps++;
+								if(pwm_percent > MAX_PWM_PERCENT)
+									 pwm_percent = MAX_PWM_PERCENT;
 
-			pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
-		
-	        if(pwm_percent < 0)
-	            pwm_percent = 0;
+						#ifdef TWO_CHIP_TEMP_S9
+								if(dev->temp_top1[PWM_T] > 110 && pwm_percent < MAX_PWM_PERCENT)
+						#else
+								if(temp_highest>=MAX_TEMP_NEED_UP_FANSTEP && pwm_percent<MAX_PWM_PERCENT)
+						#endif
+								{	// if fan speed is not max,  and temp is too high, we need add fix fan steps
+									fix_fan_steps++;
 
-			if(pwm_percent > MAX_PWM_PERCENT)
-				pwm_percent=MAX_PWM_PERCENT;
-		}
-		
+									pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
+
+						   if(pwm_percent < 0)
+							     pwm_percent = 0;
+
+									if(pwm_percent > MAX_PWM_PERCENT)
+						      pwm_percent=MAX_PWM_PERCENT;
+								}
+
         dev->fan_pwm = pwm_percent;
 
-		last_temperature = temp_highest;
+		      last_temperature = temp_highest;
         applog(LOG_DEBUG,"%s: Set PWM percent : %d\n", __FUNCTION__, pwm_percent);
         set_PWM(pwm_percent);
     }
@@ -1731,46 +1733,68 @@ void set_PWM_according_to_temperature()
 #endif
 		{	// if temp is too low, and fan speed > 0 , then we need decrease fix fan steps
 			fix_fan_steps--;
-
 			sprintf(logstr,"set normal FAN speed... with fix_fan_steps=%d\n",fix_fan_steps);
 			writeLogFile(logstr);
 
 			pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
-			
-	        if(pwm_percent < 0)
-	            pwm_percent = 0;
+
+	  if(pwm_percent < 0)
+	     pwm_percent = 0;
 
 			if(pwm_percent > MAX_PWM_PERCENT)
-				pwm_percent=MAX_PWM_PERCENT;
-			
-	        dev->fan_pwm = pwm_percent;
+			  	pwm_percent=MAX_PWM_PERCENT;
+
+	  dev->fan_pwm = pwm_percent;
 			set_PWM(pwm_percent);
 		}
 #ifdef TWO_CHIP_TEMP_S9
-		else if(dev->temp_top1[PWM_T] > 110 && pwm_percent<MAX_PWM_PERCENT)
+		else if(dev->temp_top1[PWM_T] > 110 && pwm_percent < MAX_PWM_PERCENT)
 #else
 		else if(temp_highest>=MAX_TEMP_NEED_UP_FANSTEP && pwm_percent<MAX_PWM_PERCENT)
 #endif
 		{
-			fix_fan_steps++;
+				fix_fan_steps++;
 
-			sprintf(logstr,"set normal FAN speed... with fix_fan_steps=%d\n",fix_fan_steps);
-			writeLogFile(logstr);
+				sprintf(logstr,"set normal FAN speed... with fix_fan_steps=%d\n",fix_fan_steps);
+				writeLogFile(logstr);
 
-			pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
-			
-	        if(pwm_percent < 0)
-	            pwm_percent = 0;
+				pwm_percent = MIN_PWM_PERCENT + (temp_highest-MIN_FAN_TEMP+fix_fan_steps) * PWM_ADJUST_FACTOR;
 
-			if(pwm_percent > MAX_PWM_PERCENT)
-				pwm_percent=MAX_PWM_PERCENT;
-			
-	        dev->fan_pwm = pwm_percent;
-			set_PWM(pwm_percent);
+	   if(pwm_percent < 0)
+       pwm_percent = 0;
+
+		 	if(pwm_percent > MAX_PWM_PERCENT)
+  		 		pwm_percent = MAX_PWM_PERCENT;
+
+	   dev->fan_pwm = pwm_percent;
+			 set_PWM(pwm_percent);
 		}
 	}
 }
 #endif
+
+
+void update_fan_PWM(const char *function)
+{
+		if (function)
+	 	   applog(LOG_DEBUG, "#FAN_SET: %s: fan_eft : %d	fan_pwm : %d\n", function, dev->fan_eft,dev->fan_pwm);
+
+		if(config_parameter.fan_eft)
+		{
+	 		if((config_parameter.fan_pwm_percent >= 0) && (config_parameter.fan_pwm_percent <= 100))
+	 		{
+	 			 set_PWM(config_parameter.fan_pwm_percent);
+	 		}
+	 		else
+	 		{
+	 			 set_PWM_according_to_temperature();
+	 		}
+		}
+		else
+		{
+			 set_PWM_according_to_temperature();
+		}
+}
 
 static void get_plldata(int type,int freq,uint32_t * reg_data,uint16_t * reg_data2, uint32_t *vil_data)
 {
@@ -1867,7 +1891,7 @@ void set_frequency_with_addr_plldatai(int pllindex,unsigned char mode,unsigned c
         {
             buf[0] = VIL_COMMAND_TYPE | SET_CONFIG;
         }
-		
+
         buf[1] = 0x09;
         buf[2] = addr;
         buf[3] = PLL_PARAMETER;
@@ -1898,7 +1922,7 @@ void set_frequency_with_addr_plldatai(int pllindex,unsigned char mode,unsigned c
 
 int get_pll_index(int freq)
 {
-	
+
 	int i;
 	char freq_str[10];
 	sprintf(freq_str,"%d", freq);
@@ -1994,7 +2018,7 @@ static void DownOneChipFreqOneStep()
 	uint8_t tmp_vol;
 	int board_rate=0;
 	int max_freq=0,max_freq_chipIndex=0,max_rate_chainIndex=0;
-	
+
 	memcpy(voltage_array,chain_voltage,sizeof(chain_voltage));
 
 	// desc order for voltage value
@@ -2044,7 +2068,7 @@ static void DownOneChipFreqOneStep()
 			}
 			if(max_freq_chipIndex<0)
 				continue;
-			
+
 			//down one step on highest chip, but freq must be > 250M
 			if(max_freq<=MIN_FREQ)
 				continue;
@@ -2065,7 +2089,7 @@ static void DownOneChipFreqOneStep()
 	int board_rate=0;
 	int max_freq=0,max_freq_chipIndex=0,max_rate_chainIndex=0;
 	char logstr[256];
-	
+
 	board_rate=0;
 	max_rate_chainIndex=-1;
 	//find the highest rate board with this voltage
@@ -2080,7 +2104,7 @@ static void DownOneChipFreqOneStep()
 			}
 		}
 	}
-	
+
 	if(max_rate_chainIndex<0)
 	{
 		sprintf(logstr,"Fatal Error: DownOneChipFreqOneStep has Wrong chain index=%d\n",max_rate_chainIndex);
@@ -2098,14 +2122,14 @@ static void DownOneChipFreqOneStep()
 			max_freq=last_freq[max_rate_chainIndex][j*2+3];
 		}
 	}
-	
+
 	if(max_freq_chipIndex<0)
 	{
 		sprintf(logstr,"Fatal Error: DownOneChipFreqOneStep Chain[%d] has Wrong chip index=%d\n",max_freq_chipIndex);
 		writeInitLogFile(logstr);
 		while(1)sleep(1);
 	}
-	
+
 	//down one step on highest chip, but freq must be > 250M
 	if(max_freq<=MIN_FREQ)
 	{
@@ -2134,7 +2158,7 @@ static void ProcessFixFreq()
 	{
 		//need down one step
 		do{
-			//record the current freq 
+			//record the current freq
 			for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 			{
 				if(dev->chain_exist[i] == 1)
@@ -2145,10 +2169,10 @@ static void ProcessFixFreq()
 					}
 				}
 			}
-			
+
 			//do:  down one step
 			DownOneChipFreqOneStep();
-			
+
 		}while(GetTotalRate()>fixed_totalRate);
 
 		// resume the last freq records
@@ -2172,12 +2196,12 @@ static void ProcessFixFreqForChips()
 	int fixed_totalRate=ConvirtTotalRate(totalRate);
 
 	fixed_totalRate=fixed_totalRate*(100+UPRATE_PERCENT)/100;
-	
+
 	if(GetTotalRate()>fixed_totalRate)
 	{
 		//need down one step
 		do{
-			//record the current freq 
+			//record the current freq
 			for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 			{
 				if(dev->chain_exist[i] == 1)
@@ -2188,10 +2212,10 @@ static void ProcessFixFreqForChips()
 					}
 				}
 			}
-			
+
 			//do:  down one step
 			DownOneChipFreqOneStep();
-			
+
 		}while(GetTotalRate()>fixed_totalRate);
 
 		// resume the last freq records
@@ -2244,12 +2268,12 @@ void set_frequency(unsigned short int frequency)
     uint32_t reg_data_vil = 0;
 	int chain_max_freq,chain_min_freq;
 	unsigned char minerMAC[6];
-	unsigned char hashMAC[6];	// single board test write control board's MAC into hashbaord 
+	unsigned char hashMAC[6];	// single board test write control board's MAC into hashbaord
 	unsigned char vol_pic;
 	int vol_value;
 	int default_freq_index=get_pll_index(frequency);
 	char logstr[256];
-	
+
     applog(LOG_DEBUG,"\n--- %s\n", __FUNCTION__);
 
     get_plldata(1385, frequency, &reg_data_pll, &reg_data_pll2, &reg_data_vil);
@@ -2263,7 +2287,7 @@ void set_frequency(unsigned short int frequency)
             if (last_freq[i][1] != FREQ_MAGIC)
             {
             	isUseDefaultFreq=true;
-				
+
             	last_freq[i][0]=0;
 				last_freq[i][1]=FREQ_MAGIC;
 
@@ -2280,7 +2304,7 @@ void set_frequency(unsigned short int frequency)
 			{
 				sprintf(logstr,"Chain[J%d] has core num in PIC\n",i+1);
 				writeInitLogFile(logstr);
-				
+
 				for(j = 0; j < dev->chain_asic_num[i]; j++)
 				{
 					if(j%2)
@@ -2311,7 +2335,7 @@ void set_frequency(unsigned short int frequency)
 		sprintf(logstr,"miner total rate=%dGH/s fixed rate=%dGH/s\n",GetTotalRate(),ConvirtTotalRate(GetTotalRate()));
 		writeInitLogFile(logstr);
 	}
-	
+
 	//////////////////////// just print freq record, but do not set freq, we need fix freq /////////////////////////
     for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
@@ -2323,13 +2347,13 @@ void set_frequency(unsigned short int frequency)
 			vol_value = getVolValueFromPICvoltage(vol_pic);
 			sprintf(logstr,"read PIC voltage=%d on chain[%d]\n",vol_value,i);
 			writeInitLogFile(logstr);
-			
+
         	sprintf(logstr,"Chain:%d chipnum=%d\n",i,dev->chain_asic_num[i]);
 			writeInitLogFile(logstr);
-            
+
 			sprintf(logstr,"Chain[J%d] voltage added=0.%dV\n",i+1,last_freq[i][10]&0x3f);
 			writeInitLogFile(logstr);
-			
+
         	get_macBytes("eth0",minerMAC);
 
 			hashMAC[0]=((last_freq[i][12]&0x0f)<<4)+(last_freq[i][14]&0x0f);
@@ -2349,30 +2373,30 @@ void set_frequency(unsigned short int frequency)
 				sprintf(logstr,"Chain[J%d] [minerMAC: %02x:%02x:%02x:%02x:%02x:%02x hashMAC: %02x:%02x:%02x:%02x:%02x:%02x]\n",i+1, minerMAC[0],minerMAC[1],minerMAC[2],minerMAC[3],minerMAC[4],minerMAC[5],hashMAC[0],hashMAC[1],hashMAC[2],hashMAC[3],hashMAC[4],hashMAC[5]);
 				writeInitLogFile(logstr);
 			}
-			
+
         	pic_temp_offset[i]=((last_freq[i][2]&0x0f)<<4)+(last_freq[i][4]&0x0f);
 			sprintf(logstr,"Chain:%d temp offset=%d\n",i,(signed char)pic_temp_offset[i]);
 			writeInitLogFile(logstr);
-			
+
 			base_freq_index[i]=((last_freq[i][6]&0x0f)<<4)+(last_freq[i][8]&0x0f);
 			sprintf(logstr,"Chain:%d base freq=%s\n",i,freq_pll_1385[base_freq_index[i]].freq);
 			writeInitLogFile(logstr);
-			
+
             for(j = 0; j < dev->chain_asic_num[i]; j ++)
             {
 				step_down = last_freq[i][0] & 0x3f;
 				if(step_down == 0x3f)
 					step_down = 0;
 				last_freq[i][j*2+3] -=step_down;	// down steps based on the PIC's freq
-				
+
 				applog(LOG_NOTICE,"%s: freq index=%d\n", __FUNCTION__,last_freq[i][j*2+3]);
-				
+
 				if(last_freq[i][j*2+3]<MIN_FREQ)
 					last_freq[i][j*2+3]=MIN_FREQ;// error index, set to index of 300M as min
 
 				if(last_freq[i][j*2+3] > MAX_FREQ)
 					last_freq[i][j*2+3]=MAX_FREQ;// error index, set to index of 850M as max
-					
+
 				if(last_freq[i][j*2+3] > max_freq_index)
 					max_freq_index = last_freq[i][j*2+3];
 
@@ -2381,7 +2405,7 @@ void set_frequency(unsigned short int frequency)
 
 				if(chain_min_freq>last_freq[i][j*2+3])
 					chain_min_freq=last_freq[i][j*2+3];
-				
+
            //     set_frequency_with_addr_plldatai(last_freq[i][j*2+3],0, j * dev->addrInterval,i);
 				sprintf(logstr,"Asic[%2d]:%s ",j,freq_pll_1385[last_freq[i][j*2+3]].freq);
 		   		writeInitLogFile(logstr);
@@ -2390,13 +2414,13 @@ void set_frequency(unsigned short int frequency)
 					sprintf(logstr,"\n");
 					writeInitLogFile(logstr);
 				}
-            }	
+            }
 			sprintf(logstr,"\nChain:%d max freq=%s\n",i,freq_pll_1385[chain_max_freq].freq);
 			writeInitLogFile(logstr);
 			sprintf(logstr,"Chain:%d min freq=%s\n",i,freq_pll_1385[chain_min_freq].freq);
 			writeInitLogFile(logstr);
 
-			sprintf(logstr,"\n");	
+			sprintf(logstr,"\n");
 			writeInitLogFile(logstr);
         }
     }
@@ -2418,7 +2442,7 @@ void set_frequency(unsigned short int frequency)
 			memcpy(chip_last_freq[i],last_freq[i],256);
 		}
 	}
-	
+
 	for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
     	chain_max_freq=0;
@@ -2429,13 +2453,13 @@ void set_frequency(unsigned short int frequency)
 			vol_value = getVolValueFromPICvoltage(vol_pic);
 			sprintf(logstr,"read PIC voltage=%d on chain[%d]\n",vol_value,i);
 			writeInitLogFile(logstr);
-			
+
         	sprintf(logstr,"Chain:%d chipnum=%d\n",i,dev->chain_asic_num[i]);
 			writeInitLogFile(logstr);
-            
+
 			sprintf(logstr,"Chain[J%d] voltage added=0.%dV\n",i+1,last_freq[i][10]&0x3f);
 			writeInitLogFile(logstr);
-			
+
         	get_macBytes("eth0",minerMAC);
 
 			hashMAC[0]=((last_freq[i][12]&0x0f)<<4)+(last_freq[i][14]&0x0f);
@@ -2455,30 +2479,30 @@ void set_frequency(unsigned short int frequency)
 				sprintf(logstr,"Chain[J%d] [minerMAC: %02x:%02x:%02x:%02x:%02x:%02x hashMAC: %02x:%02x:%02x:%02x:%02x:%02x]\n",i+1, minerMAC[0],minerMAC[1],minerMAC[2],minerMAC[3],minerMAC[4],minerMAC[5],hashMAC[0],hashMAC[1],hashMAC[2],hashMAC[3],hashMAC[4],hashMAC[5]);
 				writeInitLogFile(logstr);
 			}
-			
+
         	pic_temp_offset[i]=((last_freq[i][2]&0x0f)<<4)+(last_freq[i][4]&0x0f);
 			sprintf(logstr,"Chain:%d temp offset=%d\n",i,(signed char)pic_temp_offset[i]);
 			writeInitLogFile(logstr);
-			
+
 			base_freq_index[i]=((last_freq[i][6]&0x0f)<<4)+(last_freq[i][8]&0x0f);
 			sprintf(logstr,"Chain:%d base freq=%s\n",i,freq_pll_1385[base_freq_index[i]].freq);
 			writeInitLogFile(logstr);
-			
+
             for(j = 0; j < dev->chain_asic_num[i]; j ++)
             {
 				step_down = last_freq[i][0] & 0x3f;
 				if(step_down == 0x3f)
 					step_down = 0;
 				last_freq[i][j*2+3] -=step_down;	// down 3 steps based on the PIC's freq
-				
+
 				applog(LOG_NOTICE,"%s: freq index=%d\n", __FUNCTION__,last_freq[i][j*2+3]);
-				
+
 				if(last_freq[i][j*2+3]<MIN_FREQ)
 					last_freq[i][j*2+3]=MIN_FREQ;// error index, set to index of 300M as min
 
 				if(last_freq[i][j*2+3] > MAX_FREQ)
 					last_freq[i][j*2+3]=MAX_FREQ;// error index, set to index of 850M as max
-					
+
 				if(last_freq[i][j*2+3] > max_freq_index)
 					max_freq_index = last_freq[i][j*2+3];
 
@@ -2487,17 +2511,17 @@ void set_frequency(unsigned short int frequency)
 
 				if(chain_min_freq>last_freq[i][j*2+3])
 					chain_min_freq=last_freq[i][j*2+3];
-				
+
                 set_frequency_with_addr_plldatai(last_freq[i][j*2+3],0, j * dev->addrInterval,i);
 				sprintf(logstr,"Asic[%2d]:%s ",j,freq_pll_1385[last_freq[i][j*2+3]].freq);
 				writeInitLogFile(logstr);
-				
+
 				if ((j % 8) == 0)
 				{
 					sprintf(logstr,"\n");
 					writeInitLogFile(logstr);
 				}
-            }	
+            }
 			sprintf(logstr,"\nChain:%d max freq=%s\n",i,freq_pll_1385[chain_max_freq].freq);
 			writeInitLogFile(logstr);
 			sprintf(logstr,"Chain:%d min freq=%s\n",i,freq_pll_1385[chain_min_freq].freq);
@@ -2507,7 +2531,7 @@ void set_frequency(unsigned short int frequency)
 			writeInitLogFile(logstr);
         }
     }
-	
+
 	value = atoi(freq_pll_1385[max_freq_index].freq);
 	dev->frequency = value;
 	sprintf(logstr,"max freq = %d\n",dev->frequency);
@@ -2649,7 +2673,7 @@ void read_asic_register(unsigned char chain, unsigned char mode, unsigned char c
     unsigned int ret, value;
 	char logstr[256];
 	int wait_count=0;
-	
+
     if(!opt_multi_version)    // fil mode
     {
         buf[0] = GET_STATUS;
@@ -2696,7 +2720,7 @@ void read_asic_register(unsigned char chain, unsigned char mode, unsigned char c
 				break;
 			}
         }
-		
+
         set_BC_command_buffer(cmd_buf);
 
         ret = get_BC_write_command();
@@ -2830,7 +2854,7 @@ bool check_asic_reg(unsigned int reg)
     uint64_t tmp_rate = 0;
 	int reg_processed_counter=0;
 	char logstr[256];
-	
+
 rerun_all:
     clear_register_value_buf();
     tmp_rate = 0;
@@ -2844,7 +2868,7 @@ rerun_all:
 
 		//	sprintf(logstr,"do read_asic_register on Chain[%d]...\n",i);
 		//	writeLogFile(logstr);
-			
+
 			read_asic_register(i, 1, 0, reg);
 
 		//	sprintf(logstr,"Done read_asic_register on Chain[%d]\n",i);
@@ -2859,7 +2883,7 @@ rerun_all:
 
                 pthread_mutex_lock(&reg_mutex);
                 reg_value_num = reg_value_buf.reg_value_num;
-				
+
                 if((reg_value_num >= MAX_NONCE_NUMBER_IN_FIFO || reg_value_buf.p_rd >= MAX_NONCE_NUMBER_IN_FIFO) && not_reg_data_time <3)
                 {
                     not_reg_data_time ++;
@@ -2871,7 +2895,7 @@ rerun_all:
                 	pthread_mutex_unlock(&reg_mutex);
                     return true;
                 }
-				
+
                 if(reg_value_num > 0)
                 {
                 	reg_processed_counter+=reg_value_num;
@@ -2880,14 +2904,14 @@ rerun_all:
 					{
 					//	sprintf(logstr,"read asic reg Error on Chain[%d]\n",i);
 					//	writeInitLogFile(logstr);
-						
+
 						pthread_mutex_unlock(&reg_mutex);
 						return false;
 					}
-					
+
                 //	sprintf(logstr,"process reg_value_num=%d on Chain[%d]\n",reg_value_num,i);
 				//	writeLogFile(logstr);
-			
+
                     not_reg_data_time = 0;
 
                     for(j = 0; j < reg_value_num; j++)
@@ -2896,14 +2920,14 @@ rerun_all:
                         {
                         //	sprintf(logstr,"read asic reg Error: wrong chain number=%d on Chain[%d]\n",i);
 						//	writeInitLogFile(logstr);
-							
+
                         	reg_value_buf.p_rd++;
 	                        reg_value_buf.reg_value_num--;
 	                        if(reg_value_buf.p_rd >= MAX_NONCE_NUMBER_IN_FIFO)
 	                        {
 	                            reg_value_buf.p_rd = 0;
 	                        }
-						
+
                             continue;
                         }
 
@@ -2917,14 +2941,14 @@ rerun_all:
 						{
 						//	sprintf(logstr,"%s: crc is 0x%x, but it should be 0x%x\n", __FUNCTION__, CRC5(reg_buf, (REGISTER_DATA_LENGTH+1)*8-5), reg_value_buf.reg_buffer[reg_value_buf.p_rd].crc);
 						//	writeInitLogFile(logstr);
-							
+
 							reg_value_buf.p_rd++;
 	                        reg_value_buf.reg_value_num--;
 	                        if(reg_value_buf.p_rd >= MAX_NONCE_NUMBER_IN_FIFO)
 	                        {
 	                            reg_value_buf.p_rd = 0;
 	                        }
-							
+
 							continue;
 						}
 #endif
@@ -2955,17 +2979,17 @@ rerun_all:
                             {
                                 sprintf(rate_buf + 2*i,"%02x",reg_buf[i]);
                             }
-							
+
                         //    sprintf(logstr,"%s: hashrate is %s\n", __FUNCTION__, rate_buf);
 						//	writeInitLogFile(logstr);
-							
+
                             temp_hash_rate = strtol(rate_buf,NULL,16);
                             temp_hash_rate = (temp_hash_rate << 24);
                             tmp_rate += temp_hash_rate;
                             read_num ++;
                         }
                     }
-					
+
                     if(reg == CHIP_ADDRESS)
                     {
                         if (dev->chain_asic_num[i] == CHAIN_ASIC_NUM)
@@ -2986,7 +3010,7 @@ rerun_all:
 				//	sprintf(logstr,"not_reg_data_time=%d on Chain[%d]\n",not_reg_data_time,i);
 				//	writeLogFile(logstr);
                 }
-				
+
 				pthread_mutex_unlock(&reg_mutex);
             }
 
@@ -3004,11 +3028,11 @@ rerun_all:
                 rate[i] = tmp_rate;
                 suffix_string_c5(rate[i], (char * )displayed_rate[i], sizeof(displayed_rate[i]), 6,false);
                 rate_error[i] = 0;
-				
+
             //    sprintf(logstr,"%s: chain %d hashrate is %s\n", __FUNCTION__, i, displayed_rate[i]);
 			//	writeInitLogFile(logstr);
             }
-			
+
             if(read_num == 0 || status_error )
             {
                 rate_error[i]++;
@@ -3057,7 +3081,7 @@ bool check_asic_reg_oneChain(int chainIndex, unsigned int reg)
     uint64_t tmp_rate = 0;
 	int reg_processed_counter=0;
 	char logstr[256];
-	
+
 rerun_all:
     clear_register_value_buf();
     tmp_rate = 0;
@@ -3072,7 +3096,7 @@ rerun_all:
 
 		//	sprintf(logstr,"do read_asic_register on Chain[%d]...\n",i);
 		//	writeLogFile(logstr);
-			
+
 			read_asic_register(i, 1, 0, reg);
 
 		//	sprintf(logstr,"Done read_asic_register on Chain[%d]\n",i);
@@ -3087,7 +3111,7 @@ rerun_all:
 
                 pthread_mutex_lock(&reg_mutex);
                 reg_value_num = reg_value_buf.reg_value_num;
-				
+
                 if((reg_value_num >= MAX_NONCE_NUMBER_IN_FIFO || reg_value_buf.p_rd >= MAX_NONCE_NUMBER_IN_FIFO) && not_reg_data_time <3)
                 {
                     not_reg_data_time ++;
@@ -3099,7 +3123,7 @@ rerun_all:
                 	pthread_mutex_unlock(&reg_mutex);
                     return true;
                 }
-				
+
                 if(reg_value_num > 0)
                 {
                 	reg_processed_counter+=reg_value_num;
@@ -3111,10 +3135,10 @@ rerun_all:
 						pthread_mutex_unlock(&reg_mutex);
 						return false;
 					}
-					
+
                 //	sprintf(logstr,"process reg_value_num=%d on Chain[%d]\n",reg_value_num,i);
 				//	writeLogFile(logstr);
-			
+
                     not_reg_data_time = 0;
 
                     for(j = 0; j < reg_value_num; j++)
@@ -3127,7 +3151,7 @@ rerun_all:
 	                        {
 	                            reg_value_buf.p_rd = 0;
 	                        }
-							
+
                             continue;
                         }
 
@@ -3146,7 +3170,7 @@ rerun_all:
 	                        {
 	                            reg_value_buf.p_rd = 0;
 	                        }
-							
+
 							continue;
 						}
 #endif
@@ -3184,7 +3208,7 @@ rerun_all:
                             read_num ++;
                         }
                     }
-					
+
                     if(reg == CHIP_ADDRESS)
                     {
                         if (dev->chain_asic_num[i] == CHAIN_ASIC_NUM)
@@ -3205,7 +3229,7 @@ rerun_all:
 				//	sprintf(logstr,"not_reg_data_time=%d on Chain[%d]\n",not_reg_data_time,i);
 				//	writeLogFile(logstr);
                 }
-				
+
 				pthread_mutex_unlock(&reg_mutex);
             }
 
@@ -3262,7 +3286,7 @@ rerun:
         reg_value_num = reg_value_buf.reg_value_num;
         //applog(LOG_NOTICE,"%s: p_wr = %d reg_value_num = %d\n", __FUNCTION__,reg_value_buf.p_wr,reg_value_buf.reg_value_num);
         pthread_mutex_unlock(&reg_mutex);
-		
+
         applog(LOG_DEBUG,"%s: reg_value_num %d", __FUNCTION__, reg_value_num);
         if((reg_value_num >= MAX_NONCE_NUMBER_IN_FIFO || reg_value_buf.p_rd >= MAX_NONCE_NUMBER_IN_FIFO ||reg_value_num ==0 ) && not_reg_data_time <RETRY_NUM)
         {
@@ -3391,7 +3415,7 @@ int8_t do_calibration_sensor_offset(unsigned char device,unsigned char chip_addr
     {
     	ret = check_reg_temp(device, 0x0, 0x0, 0, chip_addr, chain); // Read Local Temp, Without Any Exception?
     	local = ret & 0xff;
-	
+
         if ( retry_Time_Count++ > MAX_RETRY_COUNT )
         {
             // TODO: What To Do?
@@ -3516,7 +3540,7 @@ int8_t calibration_sensor_offset(unsigned char device, int chain)
 
 			set_baud_with_addr(dev->baud, 0, dev->TempChipAddr[chain][dev->chain_asic_temp_num[chain]], chain, 1, 0, (int) TEMP_MIDDLE);
 	    	check_asic_reg_with_addr(MISC_CONTROL,dev->TempChipAddr[chain][dev->chain_asic_temp_num[chain]],chain,1);
-		
+
 			ret = check_reg_temp(device, 0xfe, 0x0, 0, dev->TempChipAddr[chain][dev->chain_asic_temp_num[chain]], chain); // Read Local Temp, Without Any Exception?
 		    dev->TempChipType[chain][dev->chain_asic_temp_num[chain]]= ret & 0xff;
 
@@ -3528,7 +3552,7 @@ int8_t calibration_sensor_offset(unsigned char device, int chain)
 				dev->chain_asic_temp_num[chain]=0;
 				break;	// error, we just jump out
 			}
-				
+
 			ret = check_reg_temp(device, 0x0, 0x0, 0, dev->TempChipAddr[chain][dev->chain_asic_temp_num[chain]], chain); // Read Local Temp, Without Any Exception?
 	    	local = ret & 0xff;
 
@@ -3546,7 +3570,7 @@ int8_t calibration_sensor_offset(unsigned char device, int chain)
 				sprintf(logstr,"Chain[J%d] chip[%d] get middle temp offset=%d typeID=%02x\n",chain+1,dev->TempChipAddr[chain][i],middle_Offset[chain][i],dev->TempChipType[chain][i]);
 				writeInitLogFile(logstr);
 			}
-			
+
 			dev->chain_asic_temp_num[chain]++;
 		}
     }
@@ -3616,7 +3640,7 @@ int8_t calibration_sensor_offset(unsigned char device, int chain)
 }
 
 void clearTempLogFile()
-{	
+{
 	FILE *fd;
 	fd=fopen("/tmp/temp","w");
 	if(fd)
@@ -3626,13 +3650,13 @@ void clearTempLogFile()
 }
 
 void writeLogFile(char *logstr)
-{	
+{
 	FILE *fd;
-	fd=fopen("/tmp/temp","a+");	
-	if(fd)	
+	fd=fopen("/tmp/temp","a+");
+	if(fd)
 	{
 		fwrite(logstr,1,strlen(logstr),fd);
-		fclose(fd);	
+		fclose(fd);
 	}
 //	updateLogFile();
 	printf(logstr);
@@ -3679,12 +3703,12 @@ void do8xPattenTest()
 	doTestPatten=true;
 	startCheckNetworkJob=false;
 	pthread_mutex_lock(&reinit_mutex);
-	
+
 	set_dhash_acc_control((unsigned int)get_dhash_acc_control() & ~RUN_BIT);
 	sleep(3);
 	set_dhash_acc_control((unsigned int)get_dhash_acc_control() & ~RUN_BIT);
 	sleep(2);
-	
+
 	for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -3694,7 +3718,7 @@ void do8xPattenTest()
 	}
 
 	set_asic_ticket_mask(0);
-	clement_doTestBoardOnce(true);
+	// clement_doTestBoardOnce(true);
 
 	for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
@@ -3707,7 +3731,7 @@ void do8xPattenTest()
 	// must re-set these two address to FPGA
 	set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
     set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
-	
+
 #ifndef CAPTURE_PATTEN
 	set_asic_ticket_mask(63);	// clement
 	cgsleep_ms(10);
@@ -3715,7 +3739,7 @@ void do8xPattenTest()
 
 	set_nonce_fifo_interrupt(get_nonce_fifo_interrupt() | FLUSH_NONCE3_FIFO);
 	clear_nonce_fifo();
-	
+
     //set real timeout back
     if(opt_multi_version)
         set_time_out_control(((dev->timeout * opt_multi_version) & MAX_TIMEOUT_VALUE) | TIME_OUT_VALID);
@@ -3733,39 +3757,39 @@ void do8xPattenTest()
 void bitmain_reinit_test()
 {
 	char ret=0,j;
-    uint16_t crc = 0;
-    
-    int i=0,x = 0,y = 0;
-    int hardware_version;
-    unsigned int data = 0;
+ uint16_t crc = 0;
+
+ int i=0,x = 0,y = 0;
+ int hardware_version;
+ unsigned int data = 0;
 	bool testRet;
 	int testCounter=0;
 	char logstr[256];
 
 	pthread_mutex_lock(&iic_mutex);
-	
+
 	// clear all dev values
 	memset(dev,0x00,sizeof(struct all_parameters));
-    dev->current_job_start_address = job_start_address_1;
+ dev->current_job_start_address = job_start_address_1;
 
-    //reset FPGA & HASH board
-    {
-        set_QN_write_data_command(RESET_HASH_BOARD | RESET_ALL | RESET_FPGA | RESET_TIME(15));
-        while(get_QN_write_data_command() & RESET_HASH_BOARD)
-        {
-            cgsleep_ms(30);
-        }
-		cgsleep_ms(500);
+ //reset FPGA & HASH board
+ {
+     set_QN_write_data_command(RESET_HASH_BOARD | RESET_ALL | RESET_FPGA | RESET_TIME(15));
+     while(get_QN_write_data_command() & RESET_HASH_BOARD)
+     {
+         cgsleep_ms(30);
+     }
+     cgsleep_ms(500);
 
-		set_PWM(MAX_PWM_PERCENT);
-    }
-	
-    set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
-    set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
-    //check chain
-    check_chain();
+     set_PWM(MAX_PWM_PERCENT);
+ }
 
-    for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
+ set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
+ set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
+ //check chain
+ check_chain();
+
+ for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
         if(dev->chain_exist[i] == 1)
         {
@@ -3773,7 +3797,7 @@ void bitmain_reinit_test()
 			unsigned char vol_pic;
 			chain_voltage[i] = get_pic_voltage(i);	// read orignal voltage at first!
 			vol_pic=getPICvoltageFromValue(HIGHEST_VOLTAGE_LIMITED_HW);
-			
+
 		//	sprintf(logstr,"Chain[J%d] will use highest voltage=%d [%d] to open core\n",i+1,HIGHEST_VOLTAGE_LIMITED_HW,vol_pic);
 		//	writeInitLogFile(logstr);
 
@@ -3806,7 +3830,7 @@ void bitmain_reinit_test()
 				if(vol_value < chain_voltage_pic[i])
 				{
 					vol_pic=getPICvoltageFromValue(chain_voltage_pic[i]);
-					
+
 					sprintf(logstr,"Chain[J%d] will use backup chain_voltage=%d [%d]\n",i+1,chain_voltage_pic[i],vol_pic);
 					writeInitLogFile(logstr);
 
@@ -3832,7 +3856,7 @@ void bitmain_reinit_test()
     }
 
 	pthread_mutex_unlock(&iic_mutex);
-	
+
     cgsleep_ms(5000);
     {
         set_QN_write_data_command(RESET_HASH_BOARD | RESET_ALL | RESET_TIME(15));
@@ -3850,7 +3874,7 @@ void bitmain_reinit_test()
     //check ASIC number for every chain
     check_asic_reg(CHIP_ADDRESS);
     cgsleep_ms(10);
-    
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -3868,7 +3892,7 @@ void bitmain_reinit_test()
 
 				enable_pic_dac(i);
 				sleep(5);
-				
+
 				reset_one_hashboard(i);
 				check_asic_reg_oneChain(i,CHIP_ADDRESS);
 
@@ -3894,26 +3918,12 @@ void bitmain_reinit_test()
     }
 
     cgsleep_ms(10);
-	
+
 	 //check who control fan
 	dev->fan_eft = config_parameter.fan_eft;
 	dev->fan_pwm= config_parameter.fan_pwm_percent;
-	applog(LOG_DEBUG,"%s: fan_eft : %d	fan_pwm : %d\n", __FUNCTION__,dev->fan_eft,dev->fan_pwm);
-	if(config_parameter.fan_eft)
-	{
-		if((config_parameter.fan_pwm_percent >= 0) && (config_parameter.fan_pwm_percent <= 100))
-		{
-			set_PWM(config_parameter.fan_pwm_percent);
-		}
-		else
-		{
-			set_PWM_according_to_temperature();
-		}
-	}
-	else
-	{
-		set_PWM_according_to_temperature();
-	}
+
+	update_fan_PWM(__FUNCTION__);
 
 	//calculate real timeout
 	if(config_parameter.timeout_eft)
@@ -3940,7 +3950,7 @@ void bitmain_reinit_test()
 			dev->timeout = MAX_TIMEOUT_VALUE;
 		}
 	}
-	
+
     //set baud
     init_uart_baud();
     cgsleep_ms(10);
@@ -3965,10 +3975,10 @@ void bitmain_reinit_test()
         {
         	open_core_one_chain(i,true);
 			sleep(1);
-			
+
 			// restore the normal voltage
 			set_pic_voltage(i, chain_voltage[i]);
-		
+
 			sprintf(logstr,"Chain[J%d] set working voltage=%d [%d]\n",i+1,getVolValueFromPICvoltage(chain_voltage[i]),chain_voltage[i]);
 			writeInitLogFile(logstr);
         }
@@ -3993,12 +4003,12 @@ void doReInitTest()
 	doTestPatten=true;
 	startCheckNetworkJob=false;
 	pthread_mutex_lock(&reinit_mutex);
-	
+
 	set_dhash_acc_control((unsigned int)get_dhash_acc_control() & ~RUN_BIT);
 	sleep(3);
 	set_dhash_acc_control((unsigned int)get_dhash_acc_control() & ~RUN_BIT);
 	sleep(2);
-	
+
 	for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -4018,7 +4028,7 @@ void doReInitTest()
 	// must re-set these two address to FPGA
 	set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
     set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
-	
+
 #ifndef CAPTURE_PATTEN
 	set_asic_ticket_mask(63);	// clement
 	cgsleep_ms(10);
@@ -4026,7 +4036,7 @@ void doReInitTest()
 
 	set_nonce_fifo_interrupt(get_nonce_fifo_interrupt() | FLUSH_NONCE3_FIFO);
 	clear_nonce_fifo();
-	
+
     //set real timeout back
     if(opt_multi_version)
         set_time_out_control(((dev->timeout * opt_multi_version) & MAX_TIMEOUT_VALUE) | TIME_OUT_VALID);
@@ -4048,7 +4058,7 @@ void processTEST()
 	int chainIndex;
 	int i;
 	int cur_vol_pic,cur_vol_value,set_vol_value;
-	
+
 	if(testID==11)
 	{
 		// test : do 8xPatten test
@@ -4066,7 +4076,7 @@ void processTEST()
 
 		sprintf(logstr,"get TEST ID=%d do bitmain_core_reInit test\n",testID);
 		writeInitLogFile(logstr);
-		
+
 		bitmain_core_reInit();
 		re_calc_ghs=true;
 
@@ -4081,10 +4091,10 @@ void processTEST()
 
 		sprintf(logstr,"get TEST ID=%d do doReInitTest test\n",testID);
 		writeInitLogFile(logstr);
-		
+
 		doReInitTest();
 		re_calc_ghs=true;
-		
+
 		sprintf(logstr,"Done doReInitTest test\n");
 		writeInitLogFile(logstr);
 	}
@@ -4120,7 +4130,7 @@ void processTEST()
 				cur_vol_pic=getPICvoltageFromValue(set_vol_value);
 				sprintf(logstr,"now set pic voltage=%d on chain[J%d]\n",cur_vol_pic,i+1);
 				writeInitLogFile(logstr);
-				
+
 				set_pic_voltage(i, cur_vol_pic);
 	        }
 			else
@@ -4162,7 +4172,7 @@ void processTEST()
 				cur_vol_pic=getPICvoltageFromValue(set_vol_value);
 				sprintf(logstr,"now set pic voltage=%d on chain[J%d]\n",cur_vol_pic,i+1);
 				writeInitLogFile(logstr);
-				
+
 				set_pic_voltage(i, cur_vol_pic);
 	        }
 			else
@@ -4197,7 +4207,7 @@ void * read_temp_func()
 	int maxtemp[TEMP_POS_NUM];
 	int mintemp[TEMP_POS_NUM];
 	int cur_fan_num=0;
-	
+
 	clearTempLogFile();
 
 //	sprintf(logstr,"start read_temp_func ...\n");
@@ -4230,9 +4240,9 @@ void * read_temp_func()
 
 	//	sprintf(logstr,"Done check_asic_reg\n");
 	//	writeLogFile(logstr);
-		
-        memset(temp_top,0x00,sizeof(temp_top));
-		memset(temp_low,0x00,sizeof(temp_low));
+
+    memset(temp_top,0x00,sizeof(temp_top));
+		  memset(temp_low,0x00,sizeof(temp_low));
 
         for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
         {
@@ -4240,7 +4250,7 @@ void * read_temp_func()
             {
             //	sprintf(logstr,"do read temp on Chain[%d]\n",i);
 			//	writeLogFile(logstr);
-		
+
 				maxtemp[TEMP_POS_LOCAL]=0;
 				maxtemp[TEMP_POS_MIDDLE]=0;
 				maxtemp[TEMP_POS_BOTTOM]=0;
@@ -4255,7 +4265,7 @@ void * read_temp_func()
 				//	writeLogFile(logstr);
 					sprintf(logstr,"Chain[%d] Chip[%d] TempTypeID=%02x middle offset=%d\n",i, (dev->TempChipAddr[i][j]/4)+1, dev->TempChipType[i][j],middle_Offset[i][j]);
 					writeLogFile(logstr);
-					
+
 					if(doTestPatten)
 					{
 						pthread_mutex_lock(&temp_work_mutex[i]);
@@ -4267,35 +4277,34 @@ void * read_temp_func()
 					{
 						ret = check_reg_temp(0x98, 0x00, 0x0, 0x0, dev->TempChipAddr[i][j], i);
 					}
-					
-	                if (ret != 0)
-	                {
-	                    dev->chain_asic_temp[i][j][TEMP_POS_LOCAL] = (ret & 0xff);
 
-						sprintf(logstr,"Chain[%d] Chip[%d] local Temp=%d\n",i, (dev->TempChipAddr[i][j]/4)+1, dev->chain_asic_temp[i][j][TEMP_POS_LOCAL]);
-						writeLogFile(logstr);
-	                }
+	    if (ret != 0)
+	    {
+	       dev->chain_asic_temp[i][j][TEMP_POS_LOCAL] = (ret & 0xff);
+						  sprintf(logstr,"Chain[%d] Chip[%d] local Temp=%d\n",i, (dev->TempChipAddr[i][j]/4)+1, dev->chain_asic_temp[i][j][TEMP_POS_LOCAL]);
+						  writeLogFile(logstr);
+	    }
 					else
 					{
-						sprintf(logstr,"read failed, old value: Chain[%d] Chip[%d] local Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_LOCAL]);	
+						sprintf(logstr,"read failed, old value: Chain[%d] Chip[%d] local Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_LOCAL]);
 						writeLogFile(logstr);
 					}
 
 	    			// 0. Switch To Middle
-	    			if(doTestPatten)
-    				{
+  			if(doTestPatten)
+ 				{
 		    			pthread_mutex_lock(&temp_work_mutex[i]);
-						usleep(10000);
+						   usleep(10000);
 		    			set_baud_with_addr(dev->baud, 0, dev->TempChipAddr[i][j], i, 1, 0, (int) TEMP_MIDDLE);
-						check_asic_reg_with_addr(MISC_CONTROL,dev->TempChipAddr[i][j],i,1);
-						pthread_mutex_unlock(&temp_work_mutex[i]);
-    				}
+						   check_asic_reg_with_addr(MISC_CONTROL,dev->TempChipAddr[i][j],i,1);
+						   pthread_mutex_unlock(&temp_work_mutex[i]);
+ 				}
 					else
 					{
 						set_baud_with_addr(dev->baud, 0, dev->TempChipAddr[i][j], i, 1, 0, (int) TEMP_MIDDLE);
 						check_asic_reg_with_addr(MISC_CONTROL,dev->TempChipAddr[i][j],i,1);
 					}
-					
+
 					if(dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]<125)
 					{
 						middle_Offset_sw[i][j]=0;
@@ -4303,16 +4312,16 @@ void * read_temp_func()
 
 					if(doTestPatten)
 					{
-						pthread_mutex_lock(&temp_work_mutex[i]);
-						usleep(10000);
-						// set middle offset
-						if(middle_Offset_sw[i][j]!=0)
-						{
-							ret = check_reg_temp(0x98, 0x11, middle_Offset_sw[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
-						}
-						else 
-							ret = check_reg_temp(0x98, 0x11, middle_Offset[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
-						pthread_mutex_unlock(&temp_work_mutex[i]);
+								pthread_mutex_lock(&temp_work_mutex[i]);
+								usleep(10000);
+								// set middle offset
+								if(middle_Offset_sw[i][j]!=0)
+								{
+		  							ret = check_reg_temp(0x98, 0x11, middle_Offset_sw[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
+								}
+								else
+  									ret = check_reg_temp(0x98, 0x11, middle_Offset[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
+							 pthread_mutex_unlock(&temp_work_mutex[i]);
 					}
 					else
 					{
@@ -4321,7 +4330,7 @@ void * read_temp_func()
 						{
 							ret = check_reg_temp(0x98, 0x11, middle_Offset_sw[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
 						}
-						else 
+						else
 							ret = check_reg_temp(0x98, 0x11, middle_Offset[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
 					}
 
@@ -4329,24 +4338,23 @@ void * read_temp_func()
 					{
 						pthread_mutex_lock(&temp_work_mutex[i]);
 						usleep(10000);
-	                	ret = check_reg_temp(0x98, 0x01, 0x0, 0x0, dev->TempChipAddr[i][j], i);
+	     ret = check_reg_temp(0x98, 0x01, 0x0, 0x0, dev->TempChipAddr[i][j], i);
 						pthread_mutex_unlock(&temp_work_mutex[i]);
 					}
 					else
 					{
 						ret = check_reg_temp(0x98, 0x01, 0x0, 0x0, dev->TempChipAddr[i][j], i);
 					}
-					
-	                if (ret != 0)
-	                {
-	                    dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE] = (ret & 0xff);
 
-						if(middle_Offset_sw[i][j]!=0)
-							dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]=dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE] - middle_Offset_sw[i][j];
+     if (ret != 0)
+     {
+         dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE] = (ret & 0xff);
+         if(middle_Offset_sw[i][j]!=0)
+            dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]=dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE] - middle_Offset_sw[i][j];
 
-						sprintf(logstr,"Chain[%d] Chip[%d] middle Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]);	
-						writeLogFile(logstr);
-	                }
+         sprintf(logstr,"Chain[%d] Chip[%d] middle Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]);
+         writeLogFile(logstr);
+     }
 					else
 					{
 						if(middle_Offset_sw[i][j]!=0)
@@ -4364,7 +4372,7 @@ void * read_temp_func()
 								middle_Offset_sw[i][j] = -128 - middle_Offset[i][j];
 							ret = check_reg_temp(0x98, 0x11, middle_Offset[i][j] + middle_Offset_sw[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
 
-							sprintf(logstr,"overflow start using sw offset, old value: Chain[%d] Chip[%d] middle Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]);	
+							sprintf(logstr,"overflow start using sw offset, old value: Chain[%d] Chip[%d] middle Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_MIDDLE]);
 							writeLogFile(logstr);
 						}
 					}
@@ -4381,13 +4389,13 @@ void * read_temp_func()
 						{
 							bottom_Offset_sw[i][j]=0;
 						}
-						
+
 						// set Bottom offset
 						if(bottom_Offset_sw[i][j]!=0)
 							ret = check_reg_temp(0x98, 0x11, bottom_Offset_sw[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
-						else 
+						else
 							ret = check_reg_temp(0x98, 0x11, bottom_Offset[i][j], 1, dev->TempChipAddr[i][j], i); // Set offset
-						
+
 						ret = check_reg_temp(0x98, 0x01, 0x0, 0x0, dev->TempChipAddr[i][j], i);
 						if (ret != 0)
 						{
@@ -4396,7 +4404,7 @@ void * read_temp_func()
 							if(bottom_Offset_sw[i][j]!=0)
 								dev->chain_asic_temp[i][j][TEMP_POS_BOTTOM]=dev->chain_asic_temp[i][j][TEMP_POS_BOTTOM]+(bottom_Offset[i][j]-bottom_Offset_sw[i][j]);
 
-							sprintf(logstr,"Chain[%d] Chip[%d] bottom Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_BOTTOM]);	
+							sprintf(logstr,"Chain[%d] Chip[%d] bottom Temp=%d\n",i,(dev->TempChipAddr[i][j]/4)+1,dev->chain_asic_temp[i][j][TEMP_POS_BOTTOM]);
 							writeLogFile(logstr);
 						}
 						else
@@ -4443,7 +4451,7 @@ void * read_temp_func()
 				dev->chain_asic_mintemp[i][TEMP_POS_LOCAL]=mintemp[TEMP_POS_LOCAL];
 				dev->chain_asic_mintemp[i][TEMP_POS_MIDDLE]=mintemp[TEMP_POS_MIDDLE];
 				dev->chain_asic_mintemp[i][TEMP_POS_BOTTOM]=mintemp[TEMP_POS_BOTTOM];
-				
+
 				//  we use the max temp value of chain, as the PWM control and temp offside check!!!!
                 if(check_temp_offside)
                 {
@@ -4481,15 +4489,15 @@ void * read_temp_func()
         dev->temp_top1[TEMP_POS_LOCAL] = temp_top[TEMP_POS_LOCAL];
 		dev->temp_top1[TEMP_POS_MIDDLE] = temp_top[TEMP_POS_MIDDLE];
 		dev->temp_top1[TEMP_POS_BOTTOM] = temp_top[TEMP_POS_BOTTOM];
-		
+
         dev->temp_low1[TEMP_POS_LOCAL] = temp_low[TEMP_POS_LOCAL];
 		dev->temp_low1[TEMP_POS_MIDDLE] = temp_low[TEMP_POS_MIDDLE];
 		dev->temp_low1[TEMP_POS_BOTTOM] = temp_low[TEMP_POS_BOTTOM];
-		
+
 		// only change fan speed after read temp value!!!
 		check_fan();
-		
-		set_PWM_according_to_temperature();
+
+  update_fan_PWM(__FUNCTION__);
 
 		if(startCheckNetworkJob)
 		{
@@ -4502,14 +4510,14 @@ void * read_temp_func()
 			diff.tv_sec=0;	// ignore network job error when in test patten mode
 			cur_fan_num=MIN_FAN_NUM;
 		}
-		
+
 #ifndef DISABLE_TEMP_PROTECT
 		if(diff.tv_sec > 120 || dev->temp_top1[TEMP_POS_LOCAL] > MAX_PCB_TEMP // we use pcb temp to check protect or not
 		   || cur_fan_num < MIN_FAN_NUM /*|| dev->fan_speed_top1 < (MAX_FAN_SPEED * dev->fan_pwm / 150) */ )
 		{
 
 			global_stop = true;
-			
+
 			if(dev->temp_top1[TEMP_POS_LOCAL] > MAX_PCB_TEMP)
 				FatalErrorValue=ERROR_OVER_MAXTEMP;
 			else if(cur_fan_num < MIN_FAN_NUM)
@@ -4518,13 +4526,13 @@ void * read_temp_func()
 				FatalErrorValue=ERROR_FAN_SPEED;
 			else
 				FatalErrorValue=ERROR_UNKOWN_STATUS;
-			
+
 			if(dev->temp_top1[TEMP_POS_LOCAL] > MAX_PCB_TEMP
 			   || cur_fan_num < MIN_FAN_NUM /* || dev->fan_speed_top1 < (MAX_FAN_SPEED * dev->fan_pwm / 150) */)
 			{
 				status_error = true;
 				once_error = true;
-			
+
 				for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 				{
 					if(dev->chain_exist[i] == 1)
@@ -4535,7 +4543,7 @@ void * read_temp_func()
 					}
 				}
 			}
-			
+
 			set_dhash_acc_control((unsigned int)get_dhash_acc_control() & ~RUN_BIT);
 		}
 		else
@@ -4544,7 +4552,7 @@ void * read_temp_func()
 			if (!once_error)
 				status_error = false;
 		}
-		
+
 		if(stop_mining)
 			status_error = true;
 #endif
@@ -4556,13 +4564,13 @@ void * read_temp_func()
 			switch(FatalErrorValue)
 			{
 			case ERROR_OVER_MAXTEMP:
-				sprintf(logstr,"Fatal Error: Temperature is too high!\n");	
+				sprintf(logstr,"Fatal Error: Temperature is too high!\n");
 				break;
 			case ERROR_FAN_LOST:
-				sprintf(logstr,"Fatal Error: Fan lost!\n"); 
+				sprintf(logstr,"Fatal Error: Fan lost!\n");
 				break;
 			case ERROR_FAN_SPEED:
-				sprintf(logstr,"Fatal Error: Fan speed too low!\n");	
+				sprintf(logstr,"Fatal Error: Fan speed too low!\n");
 				break;
 			case ERROR_UNKOWN_STATUS:
 				sprintf(logstr,"Fatal Error: network connection lost!\n");
@@ -4573,10 +4581,10 @@ void * read_temp_func()
 			}
 			writeInitLogFile(logstr);
 		}
-		
+
 		sprintf(logstr,"FAN PWM: %d\n",dev->fan_pwm);
 		writeLogFile(logstr);
-		
+
 		updateLogFile();
 
 		processTEST();
@@ -4770,9 +4778,9 @@ void software_set_address()
     unsigned int i, j;
     unsigned char chip_addr = 0;
     unsigned char check_bit = 0;
-	
+
 	dev->check_bit=0;
-	
+
     applog(LOG_DEBUG,"--- %s\n", __FUNCTION__);
 
     temp_asic_number = calculate_asic_number(dev->max_asic_num_in_one_chain);
@@ -4943,7 +4951,7 @@ void init_uart_baud()
     unsigned int rBaudrate = 0, baud = 0;
     unsigned char bauddiv = 0;
     int i =0;
-	
+
     rBaudrate = 1000000 * 5/3 / dev->timeout * (64*8);  //64*8 need send bit, ratio=2/3
     baud = 25000000/rBaudrate/8 - 1;
 
@@ -5003,7 +5011,7 @@ void set_led(bool stop)
 	        system(cmd);
 	    }
 	}
-    
+
 
 }
 
@@ -5196,7 +5204,7 @@ void * check_system_work()
     cgtime(&tv_reboot);
     copy_time(&tv_start, &tv_end);
     copy_time(&tv_reboot_start, &tv_reboot);
-    
+
     int asic_num = 0, error_asic = 0, avg_num = 0;
 	int run_counter=0;
 	int rebootTestNum=readRebootTestNum();
@@ -5247,7 +5255,7 @@ void * check_system_work()
 
 			sprintf(logstr,"Debug to Re-init %d...\n",debug_counter);
 			writeInitLogFile(logstr);
-			
+
 			bitmain_core_reInit();
 
 			sprintf(logstr,"Re-init Done : %d\n",debug_counter);
@@ -5268,8 +5276,8 @@ void * check_system_work()
 			if(reinit_counter>660)	// 10min + 60s
 			{
 				reinit_counter=600;	// check after 60s next time
-				
-				// check RT value with ideal value, 
+
+				// check RT value with ideal value,
 				for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 			    {
 			    	if(dev->chain_exist[i] == 1)
@@ -5289,8 +5297,8 @@ void * check_system_work()
 			if(reinit_counter>600)
 			{
 				reinit_counter=666;
-				
-				// check RT value with ideal value, 
+
+				// check RT value with ideal value,
 				for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 			    {
 			    	if(dev->chain_exist[i] == 1)
@@ -5302,9 +5310,9 @@ void * check_system_work()
 						{
 							sprintf(logstr,"Chain[%d] RT=%f ideal=%f need re-init\n",i,rt_board_rate,ideal_board_rate);
 							writeInitLogFile(logstr);
-							
+
 							bitmain_core_reInit();
-							
+
 							sprintf(logstr,"Re-init Done\n");
 							writeInitLogFile(logstr);
 
@@ -5329,7 +5337,7 @@ void * check_system_work()
 			            disable_pic_dac(i);
 			        }
 			    }
-				
+
             	set_PWM(1);
 				system("reboot");
             }
@@ -5373,7 +5381,7 @@ void * check_system_work()
 			{
 				// keep the log , we can check it
 				system("cp /tmp/search /etc/config/lastlog -f");
-				
+
 				saveRebootTestNum(3333);	// 3333 is magic number inform that this miner failed on test !
 				rebootTestNum=3333;
 				system("sync");
@@ -5406,9 +5414,9 @@ void * check_system_work()
 							// all chips get 0 nonce
 							sprintf(logstr,"Chain[%d] get 0 nonce in 1 min\n",i);
 							writeInitLogFile(logstr);
-							
+
 							bitmain_core_reInit();
-							
+
 							sprintf(logstr,"Re-init Done\n");
 							writeInitLogFile(logstr);
 
@@ -5452,7 +5460,7 @@ void * check_system_work()
             {
                 avg_num = 1;
             }
-				
+
             for(i=0; i<BITMAIN_MAX_CHAIN_NUM; i++)
             {
                 if(dev->chain_exist[i])
@@ -5474,7 +5482,7 @@ void * check_system_work()
                         else
                         {
                             dev->chain_asic_status_string[i][j+offset] = 'o';	// still show o, not x
-							
+
                             if(!status_error)
                             	x_time[i][j]++;
                         }
@@ -5486,7 +5494,7 @@ void * check_system_work()
                         else
                         {
                             dev->chain_asic_status_string[i][j+offset] = 'x';	// still show o, not x
-							
+
                             if(!status_error)
                             	x_time[i][j]++;
                         }
@@ -5499,7 +5507,7 @@ void * check_system_work()
 
 			if(run_counter>60)
 				run_counter=0;
-			
+
             copy_time(&tv_start, &tv_end);
         }
 
@@ -5519,9 +5527,9 @@ void open_core(bool nullwork_enable)
     struct vil_work_1387 work_vil_1387;
 	char logstr[256];
 	int wati_count=0;
-	
+
     loop = 114;
-	
+
     if(!opt_multi_version)    // fil mode
     {
         set_dhash_acc_control(get_dhash_acc_control() & (~OPERATION_MODE));
@@ -5643,7 +5651,7 @@ void open_core(bool nullwork_enable)
 				ret &= ~BC_COMMAND_EN_NULL_WORK;
                 set_BC_write_command(ret);
 				cgsleep_us(1000);
-				
+
                 work_vil_1387.work_type = NORMAL_BLOCK_MARKER;
                 work_vil_1387.chain_id = 0x80 | i;
                 work_vil_1387.reserved1[0]= 0;
@@ -5652,7 +5660,7 @@ void open_core(bool nullwork_enable)
                 work_vil_1387.data[0] = 0xff;
                 work_vil_1387.data[11] = 0xff;
                 set_BC_command_buffer(cmd_buf);
-				
+
                 ret = get_BC_write_command();
                 value = BC_COMMAND_BUFFER_READY | BC_COMMAND_EN_CHAIN_ID | (i << 16) | (ret & 0xfff0ffff);
 				//ret &= ~BC_COMMAND_EN_NULL_WORK;
@@ -5723,7 +5731,7 @@ void open_core(bool nullwork_enable)
                     }
                 }
 
-				
+
             }
         }
         set_dhash_acc_control(get_dhash_acc_control()| VIL_MODE | VIL_MIDSTATE_NUMBER(opt_multi_version));
@@ -5740,11 +5748,11 @@ void open_core_one_chain(int chainIndex, bool nullwork_enable)
     unsigned char buf_vil[9] = {0,0,0,0,0,0,0,0,0};
     struct vil_work work_vil;
     struct vil_work_1387 work_vil_1387;
-	char logstr[256];
-	int wati_count=0;
-	
+	   char logstr[256];
+	   int wati_count=0;
+
     loop = 114;
-	
+
     if(!opt_multi_version)    // fil mode
     {
         set_dhash_acc_control(get_dhash_acc_control() & (~OPERATION_MODE));
@@ -5763,7 +5771,7 @@ void open_core_one_chain(int chainIndex, bool nullwork_enable)
         data[TW_WRITE_COMMAND_LEN - 1] = 0xff;
         data[TW_WRITE_COMMAND_LEN - 12] = 0xff;
 
-		i=chainIndex;
+		      i=chainIndex;
         //for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
         {
             if(dev->chain_exist[i] == 1)
@@ -5868,7 +5876,7 @@ void open_core_one_chain(int chainIndex, bool nullwork_enable)
 				ret &= ~BC_COMMAND_EN_NULL_WORK;
                 set_BC_write_command(ret);
 				cgsleep_us(1000);
-				
+
                 work_vil_1387.work_type = NORMAL_BLOCK_MARKER;
                 work_vil_1387.chain_id = 0x80 | i;
                 work_vil_1387.reserved1[0]= 0;
@@ -5877,7 +5885,7 @@ void open_core_one_chain(int chainIndex, bool nullwork_enable)
                 work_vil_1387.data[0] = 0xff;
                 work_vil_1387.data[11] = 0xff;
                 set_BC_command_buffer(cmd_buf);
-				
+
                 ret = get_BC_write_command();
                 value = BC_COMMAND_BUFFER_READY | BC_COMMAND_EN_CHAIN_ID | (i << 16) | (ret & 0xfff0ffff);
 				//ret &= ~BC_COMMAND_EN_NULL_WORK;
@@ -5948,7 +5956,7 @@ void open_core_one_chain(int chainIndex, bool nullwork_enable)
                     }
                 }
 
-				
+
             }
         }
         set_dhash_acc_control(get_dhash_acc_control()| VIL_MODE | VIL_MIDSTATE_NUMBER(opt_multi_version));
@@ -6219,7 +6227,7 @@ void * get_nonce_and_register()
     		cgsleep_ms(100);
 			continue;
     	}
-		
+
         i = 0;
         read_loop = 0;
 
@@ -6340,7 +6348,7 @@ void bitmain_reinit()
 {
 	char ret=0,j;
     uint16_t crc = 0;
-    
+
     int i=0,x = 0,y = 0;
     int hardware_version;
     unsigned int data = 0;
@@ -6349,9 +6357,9 @@ void bitmain_reinit()
 	char logstr[256];
 
 	pthread_mutex_lock(&opencore_readtemp_mutex);
-	
+
 	pthread_mutex_lock(&iic_mutex);
-	
+
 	// clear all dev values
 	memset(dev,0x00,sizeof(struct all_parameters));
     dev->current_job_start_address = job_start_address_1;
@@ -6367,7 +6375,7 @@ void bitmain_reinit()
 
 		set_PWM(MAX_PWM_PERCENT);
     }
-	
+
     set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
     set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
     //check chain
@@ -6381,7 +6389,7 @@ void bitmain_reinit()
 			unsigned char vol_pic;
 			chain_voltage[i] = get_pic_voltage(i);	// read orignal voltage at first!
 			vol_pic=getPICvoltageFromValue(HIGHEST_VOLTAGE_LIMITED_HW);
-			
+
 		//	sprintf(logstr,"Chain[J%d] will use highest voltage=%d [%d] to open core\n",i+1,HIGHEST_VOLTAGE_LIMITED_HW,vol_pic);
 		//	writeInitLogFile(logstr);
 
@@ -6414,7 +6422,7 @@ void bitmain_reinit()
 				if(vol_value < chain_voltage_pic[i])
 				{
 					vol_pic=getPICvoltageFromValue(chain_voltage_pic[i]);
-					
+
 					sprintf(logstr,"Chain[J%d] will use backup chain_voltage=%d [%d]\n",i+1,chain_voltage_pic[i],vol_pic);
 					writeInitLogFile(logstr);
 
@@ -6440,7 +6448,7 @@ void bitmain_reinit()
     }
 
 	pthread_mutex_unlock(&iic_mutex);
-	
+
     cgsleep_ms(5000);
     {
         set_QN_write_data_command(RESET_HASH_BOARD | RESET_ALL | RESET_TIME(15));
@@ -6466,7 +6474,7 @@ void bitmain_reinit()
     //check ASIC number for every chain
     check_asic_reg(CHIP_ADDRESS);
     cgsleep_ms(10);
-    
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -6484,7 +6492,7 @@ void bitmain_reinit()
 
 				enable_pic_dac(i);
 				sleep(5);
-				
+
 				reset_one_hashboard(i);
 				check_asic_reg_oneChain(i,CHIP_ADDRESS);
 
@@ -6513,26 +6521,11 @@ void bitmain_reinit()
     }
 
     cgsleep_ms(10);
-	
+
 	 //check who control fan
 	dev->fan_eft = config_parameter.fan_eft;
 	dev->fan_pwm= config_parameter.fan_pwm_percent;
-	applog(LOG_DEBUG,"%s: fan_eft : %d	fan_pwm : %d\n", __FUNCTION__,dev->fan_eft,dev->fan_pwm);
-	if(config_parameter.fan_eft)
-	{
-		if((config_parameter.fan_pwm_percent >= 0) && (config_parameter.fan_pwm_percent <= 100))
-		{
-			set_PWM(config_parameter.fan_pwm_percent);
-		}
-		else
-		{
-			set_PWM_according_to_temperature();
-		}
-	}
-	else
-	{
-		set_PWM_according_to_temperature();
-	}
+ update_fan_PWM(__FUNCTION__);
 
 	//calculate real timeout
 	if(config_parameter.timeout_eft)
@@ -6559,7 +6552,7 @@ void bitmain_reinit()
 			dev->timeout = MAX_TIMEOUT_VALUE;
 		}
 	}
-	
+
     //set baud
     init_uart_baud();
     cgsleep_ms(10);
@@ -6583,13 +6576,13 @@ void bitmain_reinit()
         if(dev->chain_exist[i] == 1)
         {
         	open_core_one_chain(i,true);
-			sleep(1);
-			
-			// restore the normal voltage
-			set_pic_voltage(i, chain_voltage[i]);
-		
-			sprintf(logstr,"Chain[J%d] set working voltage=%d [%d]\n",i+1,getVolValueFromPICvoltage(chain_voltage[i]),chain_voltage[i]);
-			writeInitLogFile(logstr);
+      			sleep(1);
+
+      			// restore the normal voltage
+      			set_pic_voltage(i, chain_voltage[i]);
+
+      			sprintf(logstr,"Chain[J%d] set working voltage=%d [%d]\n",i+1,getVolValueFromPICvoltage(chain_voltage[i]),chain_voltage[i]);
+      			writeInitLogFile(logstr);
         }
     }
 #else
@@ -6610,24 +6603,27 @@ int bitmain_c5_init(struct init_config config)
 {
     char ret=0,j;
     uint16_t crc = 0;
-    
+
     int i=0,x = 0,y = 0;
     int hardware_version;
     unsigned int data = 0;
-	bool testRet;
-	int testCounter=0;
-	char logstr[256];
+			 bool testRet;
+		  int testCounter=0;
+		  char logstr[256];
 
-	clearInitLogFile();
+	   clearInitLogFile();
 
-	isC5_CtrlBoard=isC5_Board();
+		  isC5_CtrlBoard=isC5_Board();
 
-	if(isC5_CtrlBoard)
-		sprintf(logstr,"This is C5 board.\n");
-	else sprintf(logstr,"This is XILINX board.\n");
-	writeInitLogFile(logstr);
-	
+	   if(isC5_CtrlBoard)
+	 				sprintf(logstr,"This is C5 board.\n");
+				else
+				  sprintf(logstr,"This is XILINX board.\n");
+
+ 	 	writeInitLogFile(logstr);
+
     memcpy(&config_parameter, &config, sizeof(struct init_config));
+
 
     if(config_parameter.token_type != INIT_CONFIG_TYPE)
     {
@@ -6681,6 +6677,9 @@ int bitmain_c5_init(struct init_config config)
     //init axi
     bitmain_axi_init();
 
+    if (config_parameter.fan_eft)	return 0;
+
+
     //reset FPGA & HASH board
     if(config_parameter.reset)
     {
@@ -6689,15 +6688,17 @@ int bitmain_c5_init(struct init_config config)
         {
             cgsleep_ms(30);
         }
-		cgsleep_ms(500);
+			     cgsleep_ms(500);
 
-		set_PWM(MAX_PWM_PERCENT);
+		      set_PWM(MAX_PWM_PERCENT);
     }
-	
+
     set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
     set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
+
     //check chain
     check_chain();
+
 
     char * buf_hex = NULL;
     int board_num = 0;
@@ -6760,13 +6761,13 @@ int bitmain_c5_init(struct init_config config)
 					lowest_testOK_temp[i]=MIN_TEMP_CONTINUE_DOWN_FAN;	// if too low, we just set MIN_TEMP_CONTINUE_DOWN_FAN
 #endif
 			}
-			
+
             jump_to_app_CheckAndRestorePIC(i);
-			
+
             pthread_mutex_unlock(&iic_mutex);
         }
     }
-	
+
 
     pic_heart_beat = calloc(1,sizeof(struct thr_info));
     if(thr_info_create(pic_heart_beat, NULL, pic_heart_beat_func, pic_heart_beat))
@@ -6782,12 +6783,12 @@ int bitmain_c5_init(struct init_config config)
         {
         	unsigned char vol_pic;
             pthread_mutex_lock(&iic_mutex);
-			
+
 #ifdef ENABLE_HIGH_VOLTAGE_OPENCORE
 			chain_voltage[i] = get_pic_voltage(i);	// read orignal voltage at first!
-			
+
 			vol_pic=getPICvoltageFromValue(HIGHEST_VOLTAGE_LIMITED_HW);
-			
+
 		//	sprintf(logstr,"Chain[J%d] will use highest voltage=%d [%d] to open core\n",i+1,HIGHEST_VOLTAGE_LIMITED_HW,vol_pic);
 		//	writeInitLogFile(logstr);
 
@@ -6819,7 +6820,7 @@ int bitmain_c5_init(struct init_config config)
 				if(vol_value < chain_voltage_pic[i])
 				{
 					vol_pic=getPICvoltageFromValue(chain_voltage_pic[i]);
-					
+
 					sprintf(logstr,"Chain[J%d] will use backup chain_voltage=%d [%d]\n",i+1,chain_voltage_pic[i],vol_pic);
 					writeInitLogFile(logstr);
 
@@ -6832,11 +6833,11 @@ int bitmain_c5_init(struct init_config config)
 					chain_voltage[i] = vol_pic;	// only record the working voltage, but do not set to PIC
 #endif
 
-					sprintf(logstr,"Chain[J%d] get working chain_voltage=%d\n",i+1,chain_voltage[i]);
+					sprintf(logstr, "Chain[J%d] get working chain_voltage=%d\n",i+1,chain_voltage[i]);
 					writeInitLogFile(logstr);
 				}
 			}
-			
+
 			pthread_mutex_unlock(&iic_mutex);
 		}
 	}
@@ -6860,7 +6861,7 @@ int bitmain_c5_init(struct init_config config)
     //check ASIC number for every chain
     check_asic_reg(CHIP_ADDRESS);
     cgsleep_ms(10);
-    
+
 	for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	{
 		if(dev->chain_exist[i] == 1)
@@ -6878,13 +6879,13 @@ int bitmain_c5_init(struct init_config config)
 
 				enable_pic_dac(i);
 				sleep(5);
-				
+
 				reset_one_hashboard(i);
 				check_asic_reg_oneChain(i,CHIP_ADDRESS);
 
 				sprintf(logstr,"retry Chain[J%d] has %d asic\n",i+1,dev->chain_asic_num[i]);
 				writeInitLogFile(logstr);
-			
+
 				retry_count++;
 			}
 		}
@@ -6911,22 +6912,7 @@ int bitmain_c5_init(struct init_config config)
     //check who control fan
     dev->fan_eft = config_parameter.fan_eft;
     dev->fan_pwm= config_parameter.fan_pwm_percent;
-    applog(LOG_DEBUG,"%s: fan_eft : %d  fan_pwm : %d\n", __FUNCTION__,dev->fan_eft,dev->fan_pwm);
-    if(config_parameter.fan_eft)
-    {
-        if((config_parameter.fan_pwm_percent >= 0) && (config_parameter.fan_pwm_percent <= 100))
-        {
-            set_PWM(config_parameter.fan_pwm_percent);
-        }
-        else
-        {
-            set_PWM_according_to_temperature();
-        }
-    }
-    else
-    {
-        set_PWM_according_to_temperature();
-    }
+    update_fan_PWM(__FUNCTION__);
 
     //calculate real timeout
     if(config_parameter.timeout_eft)
@@ -6957,7 +6943,7 @@ int bitmain_c5_init(struct init_config config)
     //set baud
     init_uart_baud();
     cgsleep_ms(10);
-	
+
     for(i=0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
         if(dev->chain_exist[i] == 1 && dev->chain_asic_num[i] == CHAIN_ASIC_NUM)
@@ -6980,10 +6966,10 @@ int bitmain_c5_init(struct init_config config)
         {
         	open_core_one_chain(i,true);
 			sleep(1);
-			
+
 			// restore the normal voltage
 			set_pic_voltage(i, chain_voltage[i]);
-		
+
 			sprintf(logstr,"Chain[J%d] set working voltage=%d [%d]\n",i+1,getVolValueFromPICvoltage(chain_voltage[i]),chain_voltage[i]);
 			writeInitLogFile(logstr);
         }
@@ -7013,7 +6999,7 @@ int bitmain_c5_init(struct init_config config)
 	{
 		doTestPatten=true;
 		sleep(3);
-		
+
 		for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 		{
 			if(dev->chain_exist[i] == 1)
@@ -7024,7 +7010,9 @@ int bitmain_c5_init(struct init_config config)
 
 		someBoardUpVoltage=false;
 
-		if(!clement_doTestBoard(true))
+		// if(!clement_doTestBoard(true))
+
+		if (1)
 		{
 /*
 #ifndef ENABLE_HIGH_VOLTAGE_OPENCORE	//if use high voltage open core, then we do not do re-init again
@@ -7032,7 +7020,7 @@ int bitmain_c5_init(struct init_config config)
 			{
 				sprintf(logstr,"Preheat Over but need do-reinit again...\n");
 				writeInitLogFile(logstr);
-				
+
 				for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 				{
 					if(dev->chain_exist[i] == 1)
@@ -7044,14 +7032,14 @@ int bitmain_c5_init(struct init_config config)
 				// must re-set these two address to FPGA
 				set_nonce2_and_job_id_store_address(PHY_MEM_NONCE2_JOBID_ADDRESS);
 			    set_job_start_address(PHY_MEM_JOB_START_ADDRESS_1);
-				
+
 				doTestPatten=false;
 
 				bitmain_reinit();
 
 				doTestPatten=true;
 				sleep(3);
-				
+
 				for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 				{
 					if(dev->chain_exist[i] == 1)
@@ -7060,7 +7048,7 @@ int bitmain_c5_init(struct init_config config)
 					}
 				}
 
-				clement_doTestBoardOnce(true);
+				// clement_doTestBoardOnce(true);
 			}
 #endif
 */
@@ -7238,7 +7226,7 @@ int parse_job_to_c5(unsigned char **buf,struct pool *pool,uint32_t id)
     memcpy(*buf,tmp_buf,buf_len);
 
 	memcpy(last_job_buffer,tmp_buf,buf_len);
-	
+
     free(tmp_buf);
     return buf_len;
 }
@@ -7322,7 +7310,7 @@ int send_job(unsigned char *buf)
 
 	if(doTestPatten)	// do patten , do not send job
 		return 0;
-	
+
     if(*(buf + 0) != SEND_JOB_TYPE)
     {
         applog(LOG_DEBUG,"%s: SEND_JOB_TYPE is wrong : 0x%x\n", __FUNCTION__, *(buf + 0));
@@ -7769,7 +7757,7 @@ void * send_mac()
     mac = (char *)malloc(sizeof(char)*32);
     get_mac("eth0",&mac);
     while(need_send)
-    {		
+    {
         id++;
         snprintf(s, sizeof(s),
                  "{\"ctrl_board\":\"%s\",\"id\":\"%d\",\"hashboard\":[%s]}",mac,id,hash_board_id_string);
@@ -7798,6 +7786,11 @@ static bool bitmain_c5_prepare(struct thr_info *thr)
     cglock_init(&info->pool0.data_lock);
     cglock_init(&info->pool1.data_lock);
     cglock_init(&info->pool2.data_lock);
+
+				int i;
+
+				for (i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
+									mutex_init(&temp_work_mutex[i]);
 
     struct init_config c5_config =
     {
@@ -8224,11 +8217,11 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
     uint64_t hash_rate_all = 0;
     char displayed_rate_all[16];
     bool copy_data = true;
-	
+
     root = api_add_uint8(root, "miner_count", &(dev->chain_num), copy_data);
     root = api_add_string(root, "frequency", dev->frequency_t, copy_data);
     root = api_add_uint8(root, "fan_num", &(dev->fan_num), copy_data);
-	
+
     for(i = 0; i < BITMAIN_MAX_FAN_NUM; i++)
     {
         char fan_name[12];
@@ -8249,7 +8242,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
        	root = api_add_int16(root, temp2_name, &(dev->chain_asic_temp[i][0][TEMP_POS_MIDDLE]), copy_data);
     }
     for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
-    {       
+    {
 	   char temp3_name[12];
 	   sprintf(temp3_name,"temp3_%d", i+1);
        root = api_add_int16(root, temp3_name, &(dev->chain_asic_temp[i][1][TEMP_POS_MIDDLE]), copy_data);
@@ -8262,7 +8255,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		int temp;
 		double dev_sum_freq=0;
 	    sprintf(freq_sum,"freq_avg%d",i+1);
-			
+
         if(dev->chain_exist[i] == 1)
         {
 			if(last_freq[i][1] == FREQ_MAGIC)
@@ -8349,7 +8342,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		dev_sum_freq=((temp*1.0)/100);
 		root = api_add_mhs(root, freq_sum, &dev_sum_freq, true);
 	}
-	
+
 	if(1)
 	{
 		char freq_sum[32];
@@ -8370,7 +8363,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		double total_rate=0;
 		char freq_sum[32];
 		int temp;
-		
+
 	    sprintf(freq_sum,"total_rate");
 		for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
 	    {
@@ -8383,7 +8376,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		total_rate=((temp*1.0)/100);
 		root = api_add_mhs(root, freq_sum, &total_rate, true);
 	}
-	
+
 	for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
     	char freq_sum[32];
@@ -8391,7 +8384,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		int temp;
 		double dev_sum_freq=0;
 	    sprintf(freq_sum,"chain_rateideal%d",i+1);
-			
+
         if(dev->chain_exist[i] == 1)
         {
 			if(last_freq[i][1] == FREQ_MAGIC)
@@ -8400,7 +8393,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 				{
 					dev_sum_freq += atoi(freq_pll_1385[last_freq[i][j*2+3]].freq)*(BM1387_CORE_NUM-chain_badcore_num[i][j]);
 				}
-				
+
         		dev_sum_freq=((dev_sum_freq*1.0)/1000);
 
 				temp=(int)(dev_sum_freq*100);
@@ -8432,7 +8425,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
                  (double)(hw_errors) / (double)(hw_errors + total_diff1) : 0;
     root = api_add_percent(root, "Device Hardware%", &(dev_hwp), true);
     root = api_add_int(root, "no_matching_work", &hw_errors, copy_data);
-	
+
     for(i = 0; i < BITMAIN_MAX_CHAIN_NUM; i++)
     {
         char chain_name[12];
@@ -8470,7 +8463,7 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
             char chain_xtime[16];
             char xtime[2048] = "{";
             char tmp[20] = "";
-			
+
 			sprintf(chain_xtime,"chain_xtime%d",i+1);
 
 			if(x_time[i][0] != 0)
@@ -8530,8 +8523,8 @@ static struct api_data *bitmain_api_stats(struct cgpu_info *cgpu)
 		sprintf(param_name,"miner_version");
 		root = api_add_string(root, param_name, g_miner_version, copy_data);
 	}
-	
-    return root;
+
+ return root;
 }
 
 static void bitmain_c5_shutdown(struct thr_info *thr)
@@ -8566,4 +8559,3 @@ struct device_drv bitmain_c5_drv =
     .get_statline_before = get_bitmain_statline_before,
     .thread_shutdown = bitmain_c5_shutdown,
 };
-
