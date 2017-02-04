@@ -8,7 +8,7 @@ Used instructions from https://bitcointalk.org/index.php?topic=28402.15370;imode
 
 echo "src/gz base2 http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/armv7ahf-vfp-neon/base/" > /etc/opkg/base-feed.conf
 echo "src/gz noarch http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/all/" >> /etc/opkg/feeds.conf
-echo "src/gz noarch http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/armv7ahf-vfp-neon/perl/" >> /etc/opkg/feeds.conf
+echo "src/gz perl http://feeds.angstrom-distribution.org/feeds/v2013.12/ipk/eglibc/armv7ahf-vfp-neon/perl/" >> /etc/opkg/feeds.conf
 opkg update
 
 3. Setup build instruments
